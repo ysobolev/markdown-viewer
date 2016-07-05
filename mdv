@@ -1,6 +1,11 @@
 #!/usr/bin/python
 
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('WebKit', '3.0')
 import webview
+import logging
+webview.logger.setLevel(logging.ERROR)
 import watchdog.observers
 import watchdog.events
 import tempfile
