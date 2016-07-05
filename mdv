@@ -1,0 +1,60 @@
+#!/usr/bin/python
+
+import webview
+import watchdog.observers
+import watchdog.events
+import tempfile
+import markdown
+import os
+import sys
+
+#webview.config["USE_QT"] = True
+
+class Handler(watchdog.events.FileSystemEventHandler):
+    def __init__(self, renderer):
+        watchdog.events.FileSystemEventHandler.__init__(self)
+        self.renderer = renderer
+
+    def on_modified(self, event):
+        if event.src_path == self.renderer.filename:
+            self.renderer.refresh()
+
+class Renderer:
+    def __init__(self, filename):
+        self.filename = os.path.realpath(filename)
+        self.tempfile = None
+        self.handler = Handler(self)
+        self.watchdog = watchdog.observers.Observer()
+        directory = os.path.dirname(self.filename)
+        self.watchdog.schedule(self.handler, directory, recursive=False)
+        self.watchdog.start()
+        self.compile()
+        webview.create_window(self.filename, "file://" + self.tempfile.name)
+
+    def clear(self):
+        if self.tempfile:
+            os.unlink(self.tempfile.name)
+        self.tempfile = None
+
+    def refresh(self):
+        self.compile()
+        webview.load_url("file://" + self.tempfile.name)
+
+    def compile(self):
+        self.clear()
+        self.tempfile = tempfile.NamedTemporaryFile(delete=False)
+        self.tempfile.write("<html>")
+        with open(self.filename) as input_file:
+            markdown.markdownFromFile(input=input_file, output=self.tempfile)
+        self.tempfile.write("</html>")
+        self.tempfile.close()
+
+    def cleanup(self):
+        self.watchdog.stop()
+        self.clear()
+        self.watchdog.join()
+
+
+renderer = Renderer(sys.argv[1])
+renderer.cleanup()
+
